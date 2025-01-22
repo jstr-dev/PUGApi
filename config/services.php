@@ -3,6 +3,6 @@
 return [
     'slapshot' => [
         'key' => getenv('SLAPSHOT_API_KEY'),
-        'host' => (config('app.debug') ? 'staging' : 'api') . 'slapshot.gg'
+        'host' => 'https://' . (config('app.debug') ? 'staging' : 'api') . '.slapshot.gg'
     ]
 ];
