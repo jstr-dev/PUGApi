@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Exceptions\Slapshot\LobbyLimitException;
+use App\Exceptions\Slapshot\UnknownAPIException;
 use App\Exceptions\Slapshot\PlayerNotFound;
+use App\Models\GameLobby;
 use Exception;
-use Illuminate\Http\Client\HttpClientException;
 use Illuminate\Support\Facades\Http;
 
 class Slapshot
@@ -18,7 +20,7 @@ class Slapshot
         $this->key = config('services.slapshot.key');
     }
 
-    public function getSlapshotID(string $steamId)
+    public function getSlapshotID(string $steamId): string
     {
         $res = $this->get("players/steam/$steamId");
 
@@ -27,6 +29,48 @@ class Slapshot
         }
 
         return $res->json()['id'];
+    }
+
+    public function createLobby(string $name, string $password, bool $usePeriods, string $arena, int $mercyRule, int $teamSize): GameLobby
+    {
+        $res = $this->post('lobbies', [
+            'region' => 'eu-west',
+            'name' => $name,
+            'password' => $password,
+            'creator_name' => 'EUSL Pug Bot',
+            'is_periods' => $usePeriods,
+            'current_period' => 1,
+            'initial_stats' => null,
+            'arena' => $arena,
+            'mercy_rule' => $mercyRule,
+            'match_length' => 300,
+            'team_size_limit' => $teamSize,
+            'game_mode' => 'hockey',
+            'initial_score' => [
+                'home' => 0,
+                'away' => 0,
+            ],
+        ]);
+
+        if (!$res->ok()) {
+            throw new UnknownAPIException();
+        }
+
+        $res = (object) ($res->json() ?? []);
+
+        if (!isset($res->success) || $res->success !== true) {
+            if (str_contains($res->error, 'lobbies that have less than')) {
+                throw new LobbyLimitException();
+            }
+
+            throw new UnknownAPIException();
+        }
+
+        $lobby = new GameLobby();
+        $lobby->slapshot_id = $res->lobby_id;
+        $lobby->save();
+
+        return $lobby;
     }
 
     private function request(string $type, string $uri, array $payload = [], array $queryParameters = [], int $retries = 0)
