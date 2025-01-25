@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use Event;
 use Illuminate\Support\ServiceProvider;
+use SocialiteProviders\Manager\SocialiteWasCalled;
+use SocialiteProviders\Steam\SteamExtendSocialite;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -11,7 +14,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
     }
 
     /**
@@ -19,6 +21,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Event::listen(SocialiteWasCalled::class, [SteamExtendSocialite::class, 'handle']);
     }
 }

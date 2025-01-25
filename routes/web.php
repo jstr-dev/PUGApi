@@ -9,4 +9,5 @@ Route::get('/', function () {
 
 Route::controller(SteamController::class)->prefix('steam')->group(function() {
     Route::get('auth', 'authenticate');
+    Route::get('auth/callback', 'callback');
 });

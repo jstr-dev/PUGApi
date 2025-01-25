@@ -15,7 +15,7 @@ class CreateLobby extends Command
     {
         try {
             $lobby = (new Slapshot())->createLobby(
-                name: 'pug test',
+                name: 'Hiya!',
                 password: 'test',
                 usePeriods: true,
                 arena: 'Slapville_Jumbo',
