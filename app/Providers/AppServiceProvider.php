@@ -25,5 +25,11 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(SocialiteWasCalled::class, [SteamExtendSocialite::class, 'handle']);
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        if (config('app.debug')) {
+            config(['app.url' => getenv('NGROK_URL')]);
+            config(['services.slapshot.webhook' => getenv('NGROK_URL') . '/api/slapshot/lobby_webhook']);
+            config(['services.steam.redirect' => getenv('NGROK_URL') . '/steam/auth/callback']);
+        }
     }
 }

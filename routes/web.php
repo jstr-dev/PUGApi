@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\InternalAPIController;
+use App\Http\Controllers\SlapshotController;
 use App\Http\Controllers\SteamController;
 use Illuminate\Support\Facades\Route;
 

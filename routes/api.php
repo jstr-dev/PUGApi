@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\InternalAPIController;
+use App\Http\Controllers\SlapshotController;
 use Illuminate\Support\Facades\Route;
 
 Route::controller(InternalAPIController::class)
@@ -15,3 +16,7 @@ Route::controller(InternalAPIController::class)
 
         Route::get('user/authenticated', 'getUserAuthenticated');
     });
+
+Route::controller(SlapshotController::class)->prefix('slapshot')->group(function () {
+    Route::post('lobby_webhook', 'postLobbyWebhook');
+});

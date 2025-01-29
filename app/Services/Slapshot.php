@@ -50,6 +50,7 @@ class Slapshot
                 'home' => 0,
                 'away' => 0,
             ],
+            'webhook' => config('services.slapshot.webhook')
         ]);
 
         if (!$res->ok()) {
@@ -68,6 +69,7 @@ class Slapshot
 
         $lobby = new GameLobby();
         $lobby->slapshot_id = $res->lobby_id;
+        $lobby->password = $password;
         $lobby->save();
 
         return $lobby;

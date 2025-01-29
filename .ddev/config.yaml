@@ -13,6 +13,8 @@ use_dns_when_possible: true
 composer_version: "2"
 web_environment: []
 corepack_enable: false
+host_db_port: 60500
+ngrok_args: --domain scarcely-blessed-civet.ngrok-free.app
 
 # Key features of DDEV's config.yaml:
 
