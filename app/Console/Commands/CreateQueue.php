@@ -20,12 +20,14 @@ class CreateQueue extends Command
         }
 
         $name = $this->ask('Please enter a queue name');
+        $description = $this->ask('Please enter a queue description');
         $discordChannelId = $this->ask('Please enter a discord channel id');
 
         $queue = new Queue();
         $queue->id = $id;
         $queue->name = $name;
         $queue->discord_channel_id = $discordChannelId;
+        $queue->description = $description;
         $queue->save();
 
         $this->info('Queue saved.');

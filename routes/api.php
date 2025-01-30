@@ -11,7 +11,7 @@ Route::controller(InternalAPIController::class)
         Route::get('queues', 'getQueues');
         Route::get('queue/{queueId}', 'getQueue');
         Route::post('queue/{queueId}/join', 'postJoinQueue');
-        ROute::post('queue/{queueId}/leave', 'leaveQueue');
+        ROute::post('queue/{queueId}/leave', 'postLeaveQueue');
         Route::post('queue/create', 'createQueue');
 
         Route::get('user/authenticated', 'getUserAuthenticated');

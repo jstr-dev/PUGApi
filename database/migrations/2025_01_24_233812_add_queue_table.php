@@ -27,6 +27,7 @@ return new class extends Migration {
         });
 
         Schema::create('queue_users', function (Blueprint $table) {
+            $table->id();
             $table->string('queue_id');
             $table->unsignedBigInteger('player_id');
             $table->timestamps();
