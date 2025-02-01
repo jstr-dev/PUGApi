@@ -12,15 +12,28 @@ class GameService
 {
     public function createFromQueue(Queue &$queue)
     {
+        $slapshot = new Slapshot();
+        $lastId = GameLobby::max('id');
+        $lobbyName = 'EUSL ' . $queue->name . ' PUG (#' . ($lastId + 1) . ')';
+        $password = \Str::random(8);
+
+        $lobbyId = $slapshot->createLobby(
+            $lobbyName,
+            $password,
+            true,
+            'Slapville_Jumbo',
+            7,
+            4
+        );
+
         $game = new GameLobby();
         $game->queue_id = $queue->getKey();
-        $game->password = 'gimme_that_booty';
-        $game->slapshot_id = \Str::random(10);
-        $game->name = 'test';
+        $game->password = $password;
+        $game->slapshot_id = $lobbyId;
+        $game->name = $lobbyName;
         $game->save();
 
         foreach ($queue->players as $player) {
-            \Log::info('here');
             $this->addPlayerToGame($game, $player->player, $player->team, $player->is_captain);
         }
 
@@ -29,7 +42,6 @@ class GameService
 
     public function addPlayerToGame(GameLobby $game, Player $player, string $team, ?bool $isCaptain = false)
     {
-        \Log::info('and here');
         $record = new GamePlayers();
         $record->game_lobby_id = $game->getKey();
         $record->player_id = $player->getKey();

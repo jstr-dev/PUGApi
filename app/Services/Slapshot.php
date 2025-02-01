@@ -31,7 +31,7 @@ class Slapshot
         return $res->json()['id'];
     }
 
-    public function createLobby(string $name, string $password, bool $usePeriods, string $arena, int $mercyRule, int $teamSize): GameLobby
+    public function createLobby(string $name, string $password, bool $usePeriods, string $arena, int $mercyRule, int $teamSize): string
     {
         $res = $this->post('lobbies', [
             'region' => 'eu-west',
@@ -67,12 +67,7 @@ class Slapshot
             throw new UnknownAPIException();
         }
 
-        $lobby = new GameLobby();
-        $lobby->slapshot_id = $res->lobby_id;
-        $lobby->password = $password;
-        $lobby->save();
-
-        return $lobby;
+        return $res->lobby_id;
     }
 
     private function request(string $type, string $uri, array $payload = [], array $queryParameters = [], int $retries = 0)
