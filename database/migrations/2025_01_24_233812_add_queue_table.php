@@ -13,9 +13,9 @@ return new class extends Migration {
         Schema::create('players', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('steam_id');
-            $table->string('discord_id');
-            $table->string('slapshot_id');
+            $table->string('steam_id')->index();
+            $table->string('discord_id')->index();
+            $table->string('slapshot_id')->index();
             $table->timestamps();
         });
 

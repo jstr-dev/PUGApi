@@ -2,63 +2,174 @@
 
 namespace App\Services;
 
+use App\Exceptions\BotAPIException;
 use App\Models\Player;
 use App\Models\Queue;
 use App\Models\QueuePlayers;
+use Exception;
 
 class QueueService
 {
-    public function addPlayerToQueue(Queue $queue, Player $player)
+    public function addPlayerToQueue(Queue &$queue, Player $player)
     {
         $playerQueue = new QueuePlayers();
         $playerQueue->player_id = $player->getKey();
         $playerQueue->queue_id = $queue->getKey();
         $playerQueue->save();
 
-        return true;
+        $playerQueue->player = $player;
+
+        $queue->players->push($playerQueue);
     }
 
-    public function removePlayerFromQueue(Queue $queue, Player $player)
+    public function removePlayerFromQueue(Queue &$queue, Player $player)
     {
-        $playerQueue = QueuePlayers::where('player_id', $player->getKey())->where('queue_id', $queue->getKey())->first();
-        $playerQueue->delete();
+        $playerQueue = $queue->players->where('player_id', '=', $player->getKey())->first();
 
-        return true;
+        if (!$playerQueue) {
+            throw new BotAPIException('Not in queue', 'PLAYER_NOT_IN_QUEUE');
+        }
+
+        QueuePlayers::find($playerQueue->getKey())->delete();
+
+        $queue->players->forget($queue->players->search(function ($player) use ($playerQueue) {
+            return $player->id == $playerQueue->id;
+        }));
     }
 
+    // TODO: get captains by elo
     public function getCaptains(Queue &$queue)
     {
-        // this is where we'd check for elo
         $captain1 = $queue->players()->skip(6)->first();
         $captain2 = $queue->players()->skip(7)->first();
 
         return [$captain1, $captain2];
     }
 
-    public function progressState(Queue $queue)
+    public function progressState(Queue &$queue)
     {
-        $gameService = new GameService();
+        return match ($queue->state) {
+            'waiting' => $this->tryStartPicking($queue),
+            'picking' => $this->tryToFinish($queue),
+            default => false,
+        };
+    }
 
-        $queue->refresh();
+    public function tryToFinish(Queue &$queue)
+    {
+        if ($queue->players->whereNull('team')->count() > 1) {
+            return;
+        }
 
-        if ($queue->state != 'waiting' || $queue->players()->count() !== 8) {
+        if ($queue->players->whereNull('team')->count() === 1) {
+            $player = $queue->players->whereNull('team')->first();
+            $player->team = $queue->team_picking;
+            $player->save();
+        }
+
+        $game = (new GameService())->createFromQueue($queue);
+
+        $queue->team_picking = null;
+        $queue->state = 'finished';
+        $queue->save();
+
+        $queue->game = $game;
+    }
+
+    public function tryStartPicking(Queue &$queue)
+    {
+        if ($queue->players->count() !== 8) {
             return false;
         }
 
         [$captain1, $captain2] = $this->getCaptains($queue);
 
-        $captain1->fill(['is_captain' => true, 'team' => 0])->save();
-        $captain2->fill(['is_captain' => true, 'team' => 1])->save();
+        $captain1->is_captain = true;
+        $captain2->is_captain = true;
+        $captain1->team = 'home';
+        $captain2->team = 'away';
+        $captain1->save();
+        $captain2->save();
 
-        $game = $gameService->createWithCaptains($captain1->player, $captain2->player);
-
-        // Currently picking
-        $queue->currently_picking_id = $captain1->player->getKey();
-        $queue->current_game_id = $game->getKey();
-
+        $queue->team_picking = 'home';
         $queue->state = 'picking';
         $queue->save();
 
+        $queue->load(['players', 'players.player']);
+
         return true;
+    }
+
+    public function reset(Queue &$queue, bool $dontKick = false)
+    {
+        $queue->team_picking = null;
+        $queue->state = 'waiting';
+        $queue->save();
+
+        if (!$dontKick) {
+            QueuePlayers::where('queue_id', '=', $queue->getKey())
+                ->delete();
+        }
+
+        $queue->refresh();
+        $queue->load(['players', 'players.player']);
+    }
+
+    // TODO: make this not bad.
+    public function calculateNextPick(Queue &$queue)
+    {
+        $order = ['home', 'away', 'away', 'home', 'home', 'away'];
+        // $order = ['home', 'home', 'home', 'home', 'home', 'home'];
+        $remaining = $queue->players->whereNull('team')->count();
+        \Log::info('Remaining: ' . $remaining);
+
+        return array_reverse($order)[max($remaining - 1, 0)];
+    }
+
+    public function updateQueuePlayerAttr(Queue &$queue, QueuePlayers &$queuePlayer, string $attr, $value)
+    {
+        $queuePlayer->{$attr} = $value;
+        $queue->players->each(function ($player) use ($queuePlayer, $attr, $value) {
+            if ($player->getKey() === $queuePlayer->getKey()) {
+                $player->{$attr} = $value;
+            }
+        });
+    }
+
+    public function pickPlayer(Queue &$queue, Player &$player, int $queuePlayerId)
+    {
+        if ($queue->state !== 'picking') {
+            throw new BotAPIException('Queue is not picking', 'QUEUE_NOT_PICKING');
+        }
+
+        $callingPlayer = $queue->players->where('player_id', '=', $player->getKey())->first();
+
+        if (!$callingPlayer) {
+            throw new BotAPIException('Player not in queue', 'PLAYER_NOT_IN_QUEUE');
+        }
+
+        if (!$callingPlayer->is_captain) {
+            throw new BotAPIException('Player is not a captain', 'PLAYER_NOT_CAPTAIN');
+        }
+
+        if ($callingPlayer->team !== $queue->team_picking) {
+            throw new BotAPIException('Player is not picking', 'TEAM_NOT_PICKING');
+        }
+
+        $pickedPlayer = $queue->players->where('id', '=', $queuePlayerId)->first();
+
+        if (!$pickedPlayer) {
+            throw new BotAPIException('Picked player is not in queue', 'PICKED_PLAYER_NOT_IN_QUEUE');
+        }
+
+        if ($pickedPlayer->team || $pickedPlayer->is_captain) {
+            throw new BotAPIException('Picked player is already picked', 'PICKED_PLAYER_ALREADY_PICKED');
+        }
+
+        $this->updateQueuePlayerAttr($queue, $pickedPlayer, 'team', $callingPlayer->team);
+        $pickedPlayer->save();
+
+        $queue->team_picking = $this->calculateNextPick($queue);
+        $queue->save();
     }
 }

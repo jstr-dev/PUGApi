@@ -12,9 +12,6 @@ return new class extends Migration {
     {
         Schema::table('queue', function (Blueprint $table) {
             $table->enum('state', ['waiting', 'picking'])->after('discord_channel_id')->default('waiting');
-            $table->unsignedBigInteger('current_game_id')->nullable()->after('state');
-
-            $table->foreign('current_game_id')->references('id')->on('game_lobbies')->onDelete('cascade');
         });
 
         Schema::table('game_lobbies', function (Blueprint $table) {
@@ -25,7 +22,7 @@ return new class extends Migration {
             $table->id();
             $table->unsignedBigInteger('game_lobby_id')->index();
             $table->unsignedBigInteger('player_id');
-            $table->tinyInteger('team')->default(0);
+            $table->enum('team', ['home', 'away']);
             $table->boolean('is_captain')->default(false);
             $table->timestamps();
 
@@ -47,8 +44,6 @@ return new class extends Migration {
 
         Schema::table('queue', function (Blueprint $table) {
             $table->dropColumn('state');
-            $table->dropForeign('queue_current_game_id_foreign');
-            $table->dropColumn('current_game_id');
         });
     }
 };

@@ -11,13 +11,11 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('queue', function (Blueprint $table) {
-            $table->unsignedBigInteger('currently_picking_id')->nullable()->after('current_game_id');
-
-            $table->foreign('currently_picking_id')->references('id')->on('players')->onDelete('cascade');
+            $table->enum('team_picking', ['home', 'away'])->nullable()->after('state');
         });
 
         Schema::table('queue_users', function (Blueprint $table) {
-            $table->tinyInteger('team')->after('player_id')->nullable();
+            $table->enum('team', ['home', 'away'])->after('player_id')->nullable();
             $table->boolean('is_captain')->default(false)->after('team');
         });
     }
@@ -28,8 +26,7 @@ return new class extends Migration {
     public function down(): void
     {
         Schema::table('queue', function (Blueprint $table) {
-            $table->dropForeign('queue_currently_picking_id_foreign');
-            $table->dropColumn('currently_picking_id');
+            $table->dropColumn('team_picking');
         });
 
         Schema::table('queue_users', function (Blueprint $table) {

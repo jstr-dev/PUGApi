@@ -5,12 +5,31 @@ namespace App\Services;
 use App\Models\GameLobby;
 use App\Models\GamePlayers;
 use App\Models\Player;
+use App\Models\Queue;
 use Exception;
 
 class GameService
 {
-    public function addPlayerToGame(GameLobby $game, Player $player, int $team, ?bool $isCaptain = false)
+    public function createFromQueue(Queue &$queue)
     {
+        $game = new GameLobby();
+        $game->queue_id = $queue->getKey();
+        $game->password = 'gimme_that_booty';
+        $game->slapshot_id = \Str::random(10);
+        $game->name = 'test';
+        $game->save();
+
+        foreach ($queue->players as $player) {
+            \Log::info('here');
+            $this->addPlayerToGame($game, $player->player, $player->team, $player->is_captain);
+        }
+
+        return $game;
+    }
+
+    public function addPlayerToGame(GameLobby $game, Player $player, string $team, ?bool $isCaptain = false)
+    {
+        \Log::info('and here');
         $record = new GamePlayers();
         $record->game_lobby_id = $game->getKey();
         $record->player_id = $player->getKey();
@@ -19,19 +38,6 @@ class GameService
         $record->save();
 
         return $record;
-    }
-
-    public function createWithCaptains(Player $captain1, Player $captain2): GameLobby
-    {
-        $game = new GameLobby();
-        $game->slapshot_id = ''; // TODO - make nullable
-        $game->password = '';
-        $game->save();
-
-        $this->addPlayerToGame($game, $captain1, 0, true);
-        $this->addPlayerToGame($game, $captain2, 1, true);
-
-        return $game;
     }
 
     public function processWebhook(GameLobby $lobby, string $event)

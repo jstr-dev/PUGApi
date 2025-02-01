@@ -15,15 +15,4 @@ class Queue extends Model
     {
         return $this->hasMany(QueuePlayers::class, 'queue_id', 'id');
     }
-
-    public function transform()
-    {
-        $queue = $this->toArray();
-
-        $queue['players'] = array_map(function ($player) {
-            return $player['player'];
-        }, $queue['players']);
-
-        return $queue;
-    }
 }
