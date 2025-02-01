@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class QueuePlayers extends Model
 {
     protected $table = 'queue_users';
+    protected $fillable = ['queue_id', 'player_id'];
 
     public function player(): HasOne
     {

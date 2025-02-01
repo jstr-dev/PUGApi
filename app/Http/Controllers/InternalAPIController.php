@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Player;
 use App\Models\Queue;
 use App\Models\QueuePlayers;
+use App\Services\QueueService;
 use Illuminate\Http\Request;
 
 // TODO: error codes!
@@ -35,7 +36,7 @@ class InternalAPIController extends Controller
         return response()->json($queue->transform());
     }
 
-    public function postJoinQueue(Request $request, string $queueId)
+    public function postJoinQueue(QueueService $queueService, Request $request, string $queueId)
     {
         $player = Player::where('discord_id', $request->discord_id)->first();
 
@@ -43,7 +44,8 @@ class InternalAPIController extends Controller
             return response()->json(['error' => 'Player not found.', 'code' => 'PLAYER_NOT_FOUND'], 404);
         }
 
-        if (!Queue::where('id', $queueId)->exists()) {
+        $queue = Queue::where('id', $queueId)->first();
+        if (!$queue) {
             return response()->json(['error' => 'Queue not found.', 'code' => 'QUEUE_NOT_FOUND'], 404);
         }
 
@@ -57,14 +59,16 @@ class InternalAPIController extends Controller
             return response()->json(['error' => 'Player already in another queue.', 'code' => 'PLAYER_ALREADY_IN_ANOTHER_QUEUE'], 400);
         }
 
-        if (QueuePlayers::where('queue_id', $queueId)->count() >= 8) {
+        $queueCount = QueuePlayers::where('queue_id', $queueId)->count();
+        if ($queueCount >= 8) {
             return response()->json(['error' => 'Queue is full.', 'code' => 'QUEUE_FULL'], 400);
         }
 
-        $playerQueue = new QueuePlayers();
-        $playerQueue->player_id = $player->id;
-        $playerQueue->queue_id = $queueId;
-        $playerQueue->save();
+        $queueService->addPlayerToQueue($queue, $player);
+
+        if ($queueService->progressState($queue)) {
+
+        }
 
         return response()->json(Queue::find($queueId)->first()->transform());
     }
@@ -77,8 +81,13 @@ class InternalAPIController extends Controller
             return response()->json(['error' => 'Player not found.', 'code' => 'PLAYER_NOT_FOUND'], 404);
         }
 
-        if (!Queue::where('id', $queueId)->exists()) {
+        $queue = Queue::where('id', $queueId)->first();
+        if (!$queue) {
             return response()->json(['error' => 'Queue not found.', 'code' => 'QUEUE_NOT_FOUND'], 404);
+        }
+
+        if ($queue->state != 'waiting') {
+            return response()->json(['error' => 'Queue is not waiting.', 'code' => 'QUEUE_IN_PROGRESS'], 400);
         }
 
         $playerQueue = QueuePlayers::where('player_id', $player->id)->where('queue_id', $queueId)->first();
