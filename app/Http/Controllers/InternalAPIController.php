@@ -135,6 +135,8 @@ class InternalAPIController extends Controller
             'expires_at' => ['required', 'numeric'],
         ]);
 
+        \Log::info(print_r($request->all(), true));
+
         $player = Player::where('discord_id', $request->discord_id)->first();
 
         if (!$player) {
@@ -148,7 +150,7 @@ class InternalAPIController extends Controller
         }
 
         try {
-            [$ban, $queue] = $queueService->banPlayer($player, $admin, Carbon::createFromTimestamp($request->expires_at), $request->reason);
+            [$ban, $queue] = $queueService->banPlayer($admin, $player, Carbon::createFromTimestamp($request->expires_at), $request->reason);
 
             return response()->json([
                 'ban' => $ban,
