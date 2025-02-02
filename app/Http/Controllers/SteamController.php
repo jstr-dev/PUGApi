@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Slapshot\PlayerNotFound;
 use App\Models\Player;
 use App\Services\Slapshot;
 use App\Services\Steam;
@@ -51,7 +52,12 @@ class SteamController extends Controller
         }
 
         $steamId = $matches[1];
-        $slapshotId = $slapshot->getSlapshotID($steamId);
+
+        try {
+            $slapshotId = $slapshot->getSlapshotID($steamId);
+        } catch (PlayerNotFound $e) {
+            return 'who are u lol';
+        }
 
         if (
             Player::where('steam_id', $steamId)

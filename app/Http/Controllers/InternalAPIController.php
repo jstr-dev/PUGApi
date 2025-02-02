@@ -8,6 +8,7 @@ use App\Models\Player;
 use App\Models\Queue;
 use App\Models\QueuePlayers;
 use App\Services\QueueService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 // TODO: error codes!
@@ -44,7 +45,7 @@ class InternalAPIController extends Controller
             return response()->json(['error' => 'Queue not found.', 'code' => 'QUEUE_NOT_FOUND'], 404);
         }
 
-        $playerQueue = $queue->players->where('player_id', $player->id)->first();
+        $playerQueue = QueuePlayers::where('player_id', $player->id)->first();
 
         if ($playerQueue) {
             if ($playerQueue->queue_id === $queueId) {
@@ -59,7 +60,12 @@ class InternalAPIController extends Controller
             return response()->json(['error' => 'Queue is full.', 'code' => 'QUEUE_FULL'], 400);
         }
 
-        $queueService->addPlayerToQueue($queue, $player);
+        try {
+            $queueService->addPlayerToQueue($queue, $player);
+        } catch (BotAPIException $e) {
+            return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
+        }
+
         $queueService->progressState($queue);
 
         return response()->json($queue);
@@ -120,6 +126,60 @@ class InternalAPIController extends Controller
         }
     }
 
+    public function postBanPlayer(Request $request, QueueService $queueService)
+    {
+        $request->validate([
+            'discord_id' => 'required',
+            'admin_discord_id' => 'required',
+            'reason' => 'required',
+            'expires_at' => ['required', 'numeric'],
+        ]);
+
+        $player = Player::where('discord_id', $request->discord_id)->first();
+
+        if (!$player) {
+            return response()->json(['error' => 'Player not found.', 'code' => 'PLAYER_NOT_FOUND'], 404);
+        }
+
+        $admin = Player::where('discord_id', $request->admin_discord_id)->first();
+
+        if (!$admin) {
+            return response()->json(['error' => 'Admin not found.', 'code' => 'ADMIN_NOT_FOUND'], 404);
+        }
+
+        try {
+            [$ban, $queue] = $queueService->banPlayer($player, $admin, Carbon::createFromTimestamp($request->expires_at), $request->reason);
+
+            return response()->json([
+                'ban' => $ban,
+                'did_kick' => !empty($queue),
+                'queue' => $queue,
+            ]);
+        } catch (BotAPIException $e) {
+            return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
+        }
+    }
+
+    public function postUnbanPlayer(Request $request, QueueService $queueService)
+    {
+        $request->validate([
+            'discord_id' => 'required',
+        ]);
+
+        $player = Player::where('discord_id', $request->discord_id)->first();
+
+        if (!$player) {
+            return response()->json(['error' => 'Player not found.', 'code' => 'PLAYER_NOT_FOUND'], 404);
+        }
+
+        try {
+            $queueService->unbanPlayer($player);
+            return response()->json(['message' => 'Player unbanned.']);
+        } catch (BotAPIException $e) {
+            return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
+        }
+    }
+
     public function createQueue(Request $request)
     {
         $request->validate([
@@ -150,6 +210,26 @@ class InternalAPIController extends Controller
         $queueService->reset($queue);
 
         return response()->json($queue);
+    }
+
+    public function postKickQueue(Request $request, QueueService $queueService)
+    {
+        $request->validate([
+            'discord_id' => 'required',
+        ]);
+
+        $player = Player::where('discord_id', $request->discord_id)->first();
+
+        if (!$player) {
+            return response()->json(['error' => 'Player not found.', 'code' => 'PLAYER_NOT_FOUND'], 404);
+        }
+
+        try {
+            $queue = $queueService->kickPlayer($player);
+            return response()->json($queue);
+        } catch (BotAPIException $e) {
+            return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
+        }
     }
 
     public function getUserAuthenticated(Request $request)

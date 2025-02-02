@@ -1,0 +1,5 @@
+services:
+  web:
+    mem_limit: 2G         # Set memory limit
+    mem_reservation: 1G   # Set memory reservation
+    cpus: "2.0"           # Set CPU limit (this is per container)

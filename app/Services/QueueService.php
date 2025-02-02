@@ -4,14 +4,18 @@ namespace App\Services;
 
 use App\Exceptions\BotAPIException;
 use App\Models\Player;
+use App\Models\PlayerBan;
 use App\Models\Queue;
 use App\Models\QueuePlayers;
+use Carbon\Carbon;
 use Exception;
 
 class QueueService
 {
     public function addPlayerToQueue(Queue &$queue, Player $player)
     {
+        $this->checkBan($player);
+
         $playerQueue = new QueuePlayers();
         $playerQueue->player_id = $player->getKey();
         $playerQueue->queue_id = $queue->getKey();
@@ -19,7 +23,11 @@ class QueueService
 
         $playerQueue->player = $player;
 
-        $queue->players->push($playerQueue);
+        if (!($queue->players instanceof Illuminate\Database\Eloquent\Collection)) {
+            $queue->load(['players', 'players.player']);
+        } else {
+            $queue->players->push($playerQueue);
+        }
     }
 
     public function removePlayerFromQueue(Queue &$queue, Player $player)
@@ -32,9 +40,96 @@ class QueueService
 
         QueuePlayers::find($playerQueue->getKey())->delete();
 
-        $queue->players->forget($queue->players->search(function ($player) use ($playerQueue) {
-            return $player->id == $playerQueue->id;
-        }));
+        if (!($queue->players instanceof Illuminate\Database\Eloquent\Collection)) {
+            $queue->load(['players', 'players.player']);
+        } else {
+            $queue->players->forget($queue->players->search(function ($player) use ($playerQueue) {
+                return $player->id == $playerQueue->id;
+            }));
+        }
+    }
+
+    public function checkBan(Player $player)
+    {
+        $playerBan = PlayerBan::where('player_id', '=', $player->getKey())
+            ->where('expires_at', '>=', now())
+            ->where('active', '=', 1)
+            ->exists();
+
+        if ($playerBan) {
+            throw new BotAPIException('Player banned', 'PLAYER_BANNED');
+        }
+    }
+
+    public function banPlayer(Player $admin, Player $player, Carbon $expiresAt, string $reason = '')
+    {
+        $currentBan = PlayerBan::where('player_id', '=', $player->getKey())
+            ->where('expires_at', '>=', now())
+            ->where('active', '=', 1)
+            ->exists();
+
+        if ($currentBan) {
+            throw new BotAPIException('Player already banned', 'PLAYER_ALREADY_BANNED');
+        }
+
+        $playerBan = new PlayerBan();
+        $playerBan->player_id = $player->getKey();
+        $playerBan->admin_id = $admin->getKey();
+        $playerBan->expires_at = $expiresAt;
+        $playerBan->banned_at = now();
+        $playerBan->reason = $reason;
+        $playerBan->save();
+
+        $queue = false;
+
+        try {
+            $queue = $this->kickPlayer($player);
+        } finally {
+            return [$playerBan, $queue];
+        }
+    }
+
+    public function unbanPlayer(Player $player)
+    {
+        $playerBan = PlayerBan::where('player_id', '=', $player->getKey())
+            ->where('expires_at', '>=', now())
+            ->where('active', '=', 1)
+            ->first();
+
+        if (!$playerBan) {
+            throw new BotAPIException('Player not banned', 'PLAYER_NOT_BANNED');
+        }
+
+        $playerBan->active = 0;
+        $playerBan->save();
+    }
+
+    public function kickPlayer(Player $player)
+    {
+        $queue = Queue::whereHas('players', function ($query) use ($player) {
+            $query->where('player_id', $player->getKey());
+        })->first();
+
+        if (!$queue) {
+            throw new BotAPIException('Not in queue', 'PLAYER_NOT_IN_QUEUE');
+        }
+
+        $this->removePlayerFromQueue($queue, $player);
+
+        if ($queue->state !== 'waiting') {
+            $queue->state = 'waiting';
+
+            foreach ($queue->players as $player) {
+                $player->team = null;
+                $player->is_captain = false;
+                $player->save();
+            }
+
+            $queue->save();
+            $queue->load(['players', 'players.player']);
+        }
+
+        return $queue;
     }
 
     // TODO: get captains by elo
@@ -129,11 +224,17 @@ class QueueService
     public function updateQueuePlayerAttr(Queue &$queue, QueuePlayers &$queuePlayer, string $attr, $value)
     {
         $queuePlayer->{$attr} = $value;
-        $queue->players->each(function ($player) use ($queuePlayer, $attr, $value) {
-            if ($player->getKey() === $queuePlayer->getKey()) {
-                $player->{$attr} = $value;
-            }
-        });
+        $queuePlayer->save();
+
+        if (!($queue->players instanceof Illuminate\Database\Eloquent\Collection)) {
+            $queue->load(['players', 'players.player']);
+        } else {
+            $queue->players->each(function ($player) use ($queuePlayer, $attr, $value) {
+                if ($player->getKey() === $queuePlayer->getKey()) {
+                    $player->{$attr} = $value;
+                }
+            });
+        }
     }
 
     public function pickPlayer(Queue &$queue, Player &$player, int $queuePlayerId)
@@ -167,7 +268,6 @@ class QueueService
         }
 
         $this->updateQueuePlayerAttr($queue, $pickedPlayer, 'team', $callingPlayer->team);
-        $pickedPlayer->save();
 
         $queue->team_picking = $this->calculateNextPick($queue);
         $queue->save();

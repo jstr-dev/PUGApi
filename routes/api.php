@@ -15,6 +15,9 @@ Route::controller(InternalAPIController::class)
         Route::post('queue/{queueId}/pick', 'postPickQueue');
         Route::post('queue/{queueId}/reset', 'postResetQueue');
         Route::post('queue/create', 'createQueue');
+        Route::post('queue/kick', 'postKickQueue');
+        Route::post('queue/ban', 'postBanPlayer');
+        Route::post('queue/unban', 'postUnbanPlayer');
 
         Route::get('game/{gameId}/password', 'getGamePassword');
 
