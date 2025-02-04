@@ -9,7 +9,6 @@ Route::controller(InternalAPIController::class)
     ->prefix('internal')
     ->group(function () {
         Route::get('queues', 'getQueues');
-        Route::get('queue/{queueId}', 'getQueue');
         Route::post('queue/{queueId}/join', 'postJoinQueue');
         Route::post('queue/{queueId}/leave', 'postLeaveQueue');
         Route::post('queue/{queueId}/pick', 'postPickQueue');

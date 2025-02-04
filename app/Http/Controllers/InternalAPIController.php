@@ -12,24 +12,14 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 // TODO: error codes!
+// TODO: use API resource (extend Json class)
+// TODO: optimise less queries
+// TODO: refactor into service.
 class InternalAPIController extends Controller
 {
     public function getQueues()
     {
         return response()->json(Queue::get());
-    }
-
-    public function getQueue(string $queueId)
-    {
-        $queue = Queue::where('id', '=', $queueId)
-            ->with('players.player')
-            ->first();
-
-        if (!$queue) {
-            return response()->json(['error' => 'Queue not found.', 'code' => 'QUEUE_NOT_FOUND'], 404);
-        }
-
-        return response()->json($queue);
     }
 
     public function postJoinQueue(QueueService $queueService, Request $request, string $queueId)
@@ -134,8 +124,6 @@ class InternalAPIController extends Controller
             'reason' => 'required',
             'expires_at' => ['required', 'numeric'],
         ]);
-
-        \Log::info(print_r($request->all(), true));
 
         $player = Player::where('discord_id', $request->discord_id)->first();
 

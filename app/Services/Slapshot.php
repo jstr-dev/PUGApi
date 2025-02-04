@@ -31,6 +31,12 @@ class Slapshot
         return $res->json()['id'];
     }
 
+    public function getMatchDetails(string $matchId)
+    {
+        $res = $this->get("games/$matchId");
+        return $res->json();
+    }
+
     public function createLobby(string $name, string $password, bool $usePeriods, string $arena, int $mercyRule, int $teamSize): string
     {
         $res = $this->post('lobbies', [

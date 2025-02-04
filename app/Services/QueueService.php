@@ -210,13 +210,10 @@ class QueueService
         $queue->load(['players', 'players.player']);
     }
 
-    // TODO: make this not bad.
     public function calculateNextPick(Queue &$queue)
     {
         $order = ['home', 'away', 'away', 'home', 'home', 'away'];
-        // $order = ['home', 'home', 'home', 'home', 'home', 'home'];
         $remaining = $queue->players->whereNull('team')->count();
-        \Log::info('Remaining: ' . $remaining);
 
         return array_reverse($order)[max($remaining - 1, 0)];
     }

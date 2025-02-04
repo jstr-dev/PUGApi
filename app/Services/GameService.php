@@ -52,19 +52,59 @@ class GameService
         return $record;
     }
 
-    public function processWebhook(GameLobby $lobby, string $event)
+    private function addPeriodToGame(GameLobby &$lobby, string $matchId)
     {
-        \Log::info('Hey!');
-        \Log::info($event);
-        \Log::info(print_r($lobby, true));
+        // $data = $slapshot->getMatch($matchId);
+    }
+
+    private function tryEndGame(GameLobby &$lobby)
+    {
+        // Try to end the game... blah
+        // Calculate Elo
+    }
+
+    public function processWebhook(GameLobby $lobby, string $matchId, string $event)
+    {
+        // Update game table state
+        // Try that slapshot delete lobby call
+        // Record to GamePeriods table
+        // On finalise game update Elo ratings (MAIN)
+
+        $matchData = (new Slapshot())->getMatchDetails($matchId);
+        \Log::info(json_encode($matchData, JSON_PRETTY_PRINT));
 
         switch ($event) {
             case 'match_started':
+                $lobby->state = 'playing';
+                $lobby->save();
+                break;
             case 'match_ended':
             case 'stats_reported':
+                // if ($lobby->periods->where('slapshot_id', '=', $matchId)->count() > 0) {
+                //     break;
+                // }
+
+                // $this->addPeriodToGame($lobby, $matchId);
+                // $this->tryEndGame($lobby);
             case 'lobby_destroyed':
             default:
-                throw new Exception('Unknown lobby event');
+            // throw new Exception('Unknown lobby event');
+        }
+    }
+
+    private function updatePlayerStatistics(GameLobby $game)
+    {
+        $game->load(['periods', 'players']);
+
+        $winner = $game->winner; // 'home' OR 'away'
+
+        foreach ($game->players as $player) {
+            // Ensure they were a participant in the game.
+            $lastPeriodPlayerPlayed = $game->periods->where('slapshot_id', '=', $player->slapshot_id)->last();
+            $playerTeam = $lastPeriodPlayerPlayed->team;
+            $hasWon = $playerTeam === $winner;
+            // $eloDifference = $this->calculateEloDifference( $playerElo, $teamAverageElo, $hasWon );
+            // PlayerStatitics::where(...)->elo += $eloDifference
         }
     }
 }
