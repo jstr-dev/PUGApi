@@ -10,6 +10,6 @@ class GameLobby extends Model
 
     public function players()
     {
-        return $this->hasMany(GamePlayers::class);
+        return $this->belongsToMany(Player::class, 'game_players');
     }
 }

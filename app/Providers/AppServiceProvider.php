@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Event;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
@@ -25,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(SocialiteWasCalled::class, [SteamExtendSocialite::class, 'handle']);
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        JsonResource::withoutWrapping();
 
         if (config('app.debug')) {
             config(['app.url' => getenv('NGROK_URL')]);

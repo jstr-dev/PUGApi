@@ -10,6 +10,7 @@ return [
     'pug' => [
         'shared_secret' => getenv('PUG_SHARED_SECRET'),
         'timestamp_tolerance' => 100000,
+        'default_elo' => 800
     ],
 
     'steam' => [

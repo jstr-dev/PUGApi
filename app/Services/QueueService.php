@@ -12,41 +12,21 @@ use Exception;
 
 class QueueService
 {
-    public function addPlayerToQueue(Queue &$queue, Player $player)
+    public function addPlayer(Queue &$queue, Player $player)
     {
         $this->checkBan($player);
-
-        $playerQueue = new QueuePlayers();
-        $playerQueue->player_id = $player->getKey();
-        $playerQueue->queue_id = $queue->getKey();
-        $playerQueue->save();
-
-        $playerQueue->player = $player;
-
-        if (!($queue->players instanceof Illuminate\Database\Eloquent\Collection)) {
-            $queue->load(['players', 'players.player']);
-        } else {
-            $queue->players->push($playerQueue);
-        }
+        $queue->players()->attach($player->id, ['updated_at' => now(), 'created_at' => now()]);
+        $queue->load('players');
     }
 
-    public function removePlayerFromQueue(Queue &$queue, Player $player)
+    public function removePlayer(Queue &$queue, Player $player)
     {
-        $playerQueue = $queue->players->where('player_id', '=', $player->getKey())->first();
-
-        if (!$playerQueue) {
+        if ($queue->players->where('id', '=', $player->id)->count() === 0) {
             throw new BotAPIException('Not in queue', 'PLAYER_NOT_IN_QUEUE');
         }
 
-        QueuePlayers::find($playerQueue->getKey())->delete();
-
-        if (!($queue->players instanceof Illuminate\Database\Eloquent\Collection)) {
-            $queue->load(['players', 'players.player']);
-        } else {
-            $queue->players->forget($queue->players->search(function ($player) use ($playerQueue) {
-                return $player->id == $playerQueue->id;
-            }));
-        }
+        $queue->players()->detach($player->id);
+        $queue->load('players');
     }
 
     public function checkBan(Player $player)
@@ -107,26 +87,22 @@ class QueueService
     public function kickPlayer(Player $player)
     {
         $queue = Queue::whereHas('players', function ($query) use ($player) {
-            $query->where('player_id', $player->getKey());
+            $query->where('players.id', $player->getKey());
         })->first();
 
         if (!$queue) {
             throw new BotAPIException('Not in queue', 'PLAYER_NOT_IN_QUEUE');
         }
 
-        $this->removePlayerFromQueue($queue, $player);
+        $this->removePlayer($queue, $player);
 
         if ($queue->state !== 'waiting') {
             $queue->state = 'waiting';
 
-            foreach ($queue->players as $player) {
-                $player->team = null;
-                $player->is_captain = false;
-                $player->save();
-            }
+            $queue->players()->syncWithPivotValues($queue->players->pluck('id')->toArray(), ['team' => null, 'is_captain' => false]);
 
             $queue->save();
-            $queue->load(['players', 'players.player']);
+            $queue->load('players');
         }
 
         return $queue;
@@ -156,10 +132,10 @@ class QueueService
             return;
         }
 
-        if ($queue->players->whereNull('team')->count() === 1) {
-            $player = $queue->players->whereNull('team')->first();
-            $player->team = $queue->team_picking;
-            $player->save();
+        $player = $queue->players->whereNull('team')->first();
+        if ($player) {
+            $queue->players()->updateExistingPivot($player->id, ['team' => $queue->team_picking]);
+            $queue->load('players');
         }
 
         $game = (new GameService())->createFromQueue($queue);
@@ -177,20 +153,16 @@ class QueueService
             return false;
         }
 
-        [$captain1, $captain2] = $this->getCaptains($queue);
+        [$homeCap, $awayCap] = $this->getCaptains($queue);
 
-        $captain1->is_captain = true;
-        $captain2->is_captain = true;
-        $captain1->team = 'home';
-        $captain2->team = 'away';
-        $captain1->save();
-        $captain2->save();
+        $queue->players()->updateExistingPivot($homeCap->id, ['is_captain' => true, 'team' => 'home']);
+        $queue->players()->updateExistingPivot($awayCap->id, ['is_captain' => true, 'team' => 'away']);
 
         $queue->team_picking = 'home';
         $queue->state = 'picking';
         $queue->save();
 
-        $queue->load(['players', 'players.player']);
+        $queue->load(['players']);
 
         return true;
     }
@@ -207,31 +179,16 @@ class QueueService
         }
 
         $queue->refresh();
-        $queue->load(['players', 'players.player']);
+        $queue->load(['players']);
     }
 
     public function calculateNextPick(Queue &$queue)
     {
         $order = ['home', 'away', 'away', 'home', 'home', 'away'];
+
         $remaining = $queue->players->whereNull('team')->count();
 
         return array_reverse($order)[max($remaining - 1, 0)];
-    }
-
-    public function updateQueuePlayerAttr(Queue &$queue, QueuePlayers &$queuePlayer, string $attr, $value)
-    {
-        $queuePlayer->{$attr} = $value;
-        $queuePlayer->save();
-
-        if (!($queue->players instanceof Illuminate\Database\Eloquent\Collection)) {
-            $queue->load(['players', 'players.player']);
-        } else {
-            $queue->players->each(function ($player) use ($queuePlayer, $attr, $value) {
-                if ($player->getKey() === $queuePlayer->getKey()) {
-                    $player->{$attr} = $value;
-                }
-            });
-        }
     }
 
     public function pickPlayer(Queue &$queue, Player &$player, int $queuePlayerId)
@@ -240,7 +197,7 @@ class QueueService
             throw new BotAPIException('Queue is not picking', 'QUEUE_NOT_PICKING');
         }
 
-        $callingPlayer = $queue->players->where('player_id', '=', $player->getKey())->first();
+        $callingPlayer = $queue->players->where('id', '=', $player->id)->first();
 
         if (!$callingPlayer) {
             throw new BotAPIException('Player not in queue', 'PLAYER_NOT_IN_QUEUE');
@@ -264,9 +221,9 @@ class QueueService
             throw new BotAPIException('Picked player is already picked', 'PICKED_PLAYER_ALREADY_PICKED');
         }
 
-        $this->updateQueuePlayerAttr($queue, $pickedPlayer, 'team', $callingPlayer->team);
-
+        $queue->players()->updateExistingPivot($pickedPlayer->id, ['team' => $callingPlayer->team]);
         $queue->team_picking = $this->calculateNextPick($queue);
         $queue->save();
+        $queue->load('players');
     }
 }

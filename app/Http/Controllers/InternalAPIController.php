@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\BotAPIException;
+use App\Http\Resources\QueueResource;
 use App\Models\GameLobby;
 use App\Models\Player;
 use App\Models\Queue;
@@ -19,7 +20,13 @@ class InternalAPIController extends Controller
 {
     public function getQueues()
     {
-        return response()->json(Queue::get());
+        $queues = [];
+
+        foreach (Queue::get() as $queue) {
+            $queues[] = (new QueueResource($queue))->toArray(null);
+        }
+
+        return response()->json($queues);
     }
 
     public function postJoinQueue(QueueService $queueService, Request $request, string $queueId)
@@ -51,14 +58,14 @@ class InternalAPIController extends Controller
         }
 
         try {
-            $queueService->addPlayerToQueue($queue, $player);
+            $queueService->addPlayer($queue, $player);
         } catch (BotAPIException $e) {
             return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
         }
 
         $queueService->progressState($queue);
 
-        return response()->json($queue);
+        return new QueueResource($queue);
     }
 
     public function postLeaveQueue(Request $request, string $queueId, QueueService $queueService)
@@ -79,12 +86,12 @@ class InternalAPIController extends Controller
         }
 
         try {
-            $queueService->removePlayerFromQueue($queue, $player);
+            $queueService->removePlayer($queue, $player);
         } catch (BotAPIException $e) {
             return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
         }
 
-        return response()->json($queue);
+        return new QueueResource($queue);
     }
 
     public function postPickQueue(Request $request, string $queueId, QueueService $queueService)
@@ -110,7 +117,7 @@ class InternalAPIController extends Controller
             $queueService->pickPlayer($queue, $callingPlayer, $request->queue_player_id);
             $queueService->progressState($queue);
 
-            return response()->json($queue);
+            return new QueueResource($queue);
         } catch (BotAPIException $e) {
             return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
         }
@@ -143,7 +150,7 @@ class InternalAPIController extends Controller
             return response()->json([
                 'ban' => $ban,
                 'did_kick' => !empty($queue),
-                'queue' => $queue,
+                'queue' => (new QueueResource($queue))->toArray(null),
             ]);
         } catch (BotAPIException $e) {
             return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
@@ -199,7 +206,7 @@ class InternalAPIController extends Controller
 
         $queueService->reset($queue);
 
-        return response()->json($queue);
+        return new QueueResource($queue);
     }
 
     public function postKickQueue(Request $request, QueueService $queueService)
@@ -216,7 +223,7 @@ class InternalAPIController extends Controller
 
         try {
             $queue = $queueService->kickPlayer($player);
-            return response()->json($queue);
+            return new QueueResource($queue);
         } catch (BotAPIException $e) {
             return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
         }

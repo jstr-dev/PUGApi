@@ -34,13 +34,13 @@ class GameService
         $game->save();
 
         foreach ($queue->players as $player) {
-            $this->addPlayerToGame($game, $player->player, $player->team, $player->is_captain);
+            $this->addPlayer($game, $player, $player->team, $player->is_captain);
         }
 
         return $game;
     }
 
-    public function addPlayerToGame(GameLobby $game, Player $player, string $team, ?bool $isCaptain = false)
+    public function addPlayer(GameLobby $game, Player $player, string $team, ?bool $isCaptain = false)
     {
         $record = new GamePlayers();
         $record->game_lobby_id = $game->getKey();
