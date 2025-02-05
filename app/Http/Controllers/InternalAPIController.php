@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\BotAPIException;
+use App\Exceptions\Slapshot\LobbyLimitException;
 use App\Http\Resources\QueueResource;
 use App\Models\GameLobby;
 use App\Models\Player;
@@ -120,6 +121,8 @@ class InternalAPIController extends Controller
             return new QueueResource($queue);
         } catch (BotAPIException $e) {
             return response()->json(['error' => $e->getMessage(), 'code' => $e->getApiErrorCode()], 400);
+        } catch (LobbyLimitException $e) {
+            return response()->json(['error' => 'lobby limit', 'code' => 'LOBBY_LIMIT'], 400);
         }
     }
 

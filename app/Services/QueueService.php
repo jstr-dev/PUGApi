@@ -108,13 +108,12 @@ class QueueService
         return $queue;
     }
 
-    // TODO: get captains by elo
     public function getCaptains(Queue &$queue)
     {
-        $captain1 = $queue->players()->skip(6)->first();
-        $captain2 = $queue->players()->skip(7)->first();
+        $homeCap = $queue->players->sortBy([['elo', 'desc']])->first();
+        $awayCap = $queue->players->sortBy([['elo', 'desc']])->skip(1)->first();
 
-        return [$captain1, $captain2];
+        return [$homeCap, $awayCap];
     }
 
     public function progressState(Queue &$queue)
@@ -134,7 +133,7 @@ class QueueService
 
         $player = $queue->players->whereNull('team')->first();
         if ($player) {
-            $queue->players()->updateExistingPivot($player->id, ['team' => $queue->team_picking]);
+            $queue->players()->updateExistingPivot($player->id, ['team' => $queue->team_picking, 'updated_at' => now()]);
             $queue->load('players');
         }
 
@@ -155,8 +154,8 @@ class QueueService
 
         [$homeCap, $awayCap] = $this->getCaptains($queue);
 
-        $queue->players()->updateExistingPivot($homeCap->id, ['is_captain' => true, 'team' => 'home']);
-        $queue->players()->updateExistingPivot($awayCap->id, ['is_captain' => true, 'team' => 'away']);
+        $queue->players()->updateExistingPivot($homeCap->id, ['is_captain' => true, 'team' => 'home', 'updated_at' => now()]);
+        $queue->players()->updateExistingPivot($awayCap->id, ['is_captain' => true, 'team' => 'away', 'updated_at' => now()]);
 
         $queue->team_picking = 'home';
         $queue->state = 'picking';
@@ -184,8 +183,8 @@ class QueueService
 
     public function calculateNextPick(Queue &$queue)
     {
+        return 'home';
         $order = ['home', 'away', 'away', 'home', 'home', 'away'];
-
         $remaining = $queue->players->whereNull('team')->count();
 
         return array_reverse($order)[max($remaining - 1, 0)];
@@ -221,7 +220,7 @@ class QueueService
             throw new BotAPIException('Picked player is already picked', 'PICKED_PLAYER_ALREADY_PICKED');
         }
 
-        $queue->players()->updateExistingPivot($pickedPlayer->id, ['team' => $callingPlayer->team]);
+        $queue->players()->updateExistingPivot($pickedPlayer->id, ['team' => $callingPlayer->team, 'updated_at' => now()]);
         $queue->team_picking = $this->calculateNextPick($queue);
         $queue->save();
         $queue->load('players');
