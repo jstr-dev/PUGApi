@@ -54,7 +54,7 @@ class InternalAPIController extends Controller
         }
 
         $queueCount = $queue->players->count();
-        if ($queueCount >= 8) {
+        if ($queueCount >= $queue->getMaxPlayerCount()) {
             return response()->json(['error' => 'Queue is full.', 'code' => 'QUEUE_FULL'], 400);
         }
 
@@ -80,10 +80,6 @@ class InternalAPIController extends Controller
         $queue = Queue::where('id', $queueId)->first();
         if (!$queue) {
             return response()->json(['error' => 'Queue not found.', 'code' => 'QUEUE_NOT_FOUND'], 404);
-        }
-
-        if ($queue->state != 'waiting') {
-            return response()->json(['error' => 'Queue is not waiting.', 'code' => 'QUEUE_IN_PROGRESS'], 400);
         }
 
         try {

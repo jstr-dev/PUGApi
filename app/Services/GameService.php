@@ -6,38 +6,45 @@ use App\Models\GameLobby;
 use App\Models\GamePlayers;
 use App\Models\Player;
 use App\Models\Queue;
+use DB;
 use Exception;
 
 class GameService
 {
     public function createFromQueue(Queue &$queue)
     {
-        $slapshot = new Slapshot();
-        $lastId = GameLobby::max('id');
-        $lobbyName = 'EUSL ' . $queue->name . ' PUG (#' . ($lastId + 1) . ')';
-        $password = \Str::random(8);
+        return DB::transaction(function () use ($queue) {
+            $slapshot = new Slapshot();
 
-        $lobbyId = $slapshot->createLobby(
-            $lobbyName,
-            $password,
-            true,
-            'Slapville_Jumbo',
-            7,
-            4
-        );
+            $game = new GameLobby();
+            $game->queue_id = $queue->getKey();
+            $game->password = '';
+            $game->slapshot_id = '';
+            $game->name = $queue->name;
+            $game->save();
 
-        $game = new GameLobby();
-        $game->queue_id = $queue->getKey();
-        $game->password = $password;
-        $game->slapshot_id = $lobbyId;
-        $game->name = $lobbyName;
-        $game->save();
+            $lobbyName = 'EUSL ' . $queue->name . ' PUG (#' . ($game->getKey()) . ')';
+            $password = \Str::random(8);
 
-        foreach ($queue->players as $player) {
-            $this->addPlayer($game, $player, $player->team, $player->is_captain);
-        }
+            $lobbyId = $slapshot->createLobby(
+                $lobbyName,
+                $password,
+                true,
+                'Slapville_Jumbo',
+                7,
+                4
+            );
 
-        return $game;
+            $game->password = $password;
+            $game->slapshot_id = $lobbyId;
+            $game->save();
+
+            foreach ($queue->players as $player) {
+                $this->addPlayer($game, $player, $player->team, $player->is_captain);
+            }
+
+            return $game;
+        });
     }
 
     public function addPlayer(GameLobby $game, Player $player, string $team, ?bool $isCaptain = false)
@@ -90,6 +97,14 @@ class GameService
             default:
             // throw new Exception('Unknown lobby event');
         }
+    }
+
+    public function calculateEloDifference(int $eloA, int $eloB, bool $won, int $kFactor = 40)
+    {
+        $expectedScore = 1 / (1 + pow(10, ($eloB - $eloA) / 400));
+        $actualScore = $won ? 1 : 0;
+
+        return round($kFactor * ($actualScore - $expectedScore));
     }
 
     private function updatePlayerStatistics(GameLobby $game)

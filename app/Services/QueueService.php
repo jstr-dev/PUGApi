@@ -21,6 +21,10 @@ class QueueService
 
     public function removePlayer(Queue &$queue, Player $player)
     {
+        if ($queue->state != 'waiting') {
+            return new BotAPIException('Queue is not waiting', 'QUEUE_IN_PROGRESS');
+        }
+
         if ($queue->players->where('id', '=', $player->id)->count() === 0) {
             throw new BotAPIException('Not in queue', 'PLAYER_NOT_IN_QUEUE');
         }
@@ -148,7 +152,7 @@ class QueueService
 
     public function tryStartPicking(Queue &$queue)
     {
-        if ($queue->players->count() !== 8) {
+        if ($queue->players->count() !== $queue->getMaxPlayerCount()) {
             return false;
         }
 
@@ -183,7 +187,6 @@ class QueueService
 
     public function calculateNextPick(Queue &$queue)
     {
-        return 'home';
         $order = ['home', 'away', 'away', 'home', 'home', 'away'];
         $remaining = $queue->players->whereNull('team')->count();
 

@@ -12,7 +12,7 @@ class Queue extends Model
     protected $keyType = 'string';
     protected $with = ['players'];
 
-    public function players(): BelongsToMany
+    public function players() 
     {
         return $this->belongsToMany(Player::class, 'queue_users')
             ->select(['players.id', 'players.name', 'players.discord_id', 'queue_users.team', 'queue_users.is_captain', 'queue_users.updated_at', 'player_statistics.elo'])
@@ -20,5 +20,10 @@ class Queue extends Model
                 $join->on('players.id', '=', 'player_statistics.player_id')
                     ->on('player_statistics.queue_id', '=', 'queue_users.queue_id');
             });
+    }
+
+    public function getMaxPlayerCount()
+    {
+        return 8;   
     }
 }
