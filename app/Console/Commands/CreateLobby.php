@@ -33,7 +33,7 @@ class CreateLobby extends Command
             $lobby->name = 'Hiya!';
             $lobby->save();
 
-            (new GameService())->addPlayerToGame(
+            (new GameService())->addPlayer(
                 game: $lobby,
                 player: Player::where('name', 'justa')->first(),
                 team: 'home',

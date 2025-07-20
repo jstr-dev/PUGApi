@@ -11,6 +11,9 @@ class Queue extends Model
     protected $table = 'queue';
     protected $keyType = 'string';
     protected $with = ['players'];
+    protected $casts = [
+        'picking_order' => 'array'
+    ];
 
     public function players() 
     {
@@ -24,6 +27,11 @@ class Queue extends Model
 
     public function getMaxPlayerCount()
     {
-        return 8;   
+        return $this->player_count ?? 8;   
+    }
+
+    public function getPickingOrder()
+    {
+        return $this->picking_order ?? ['home', 'away', 'away', 'home', 'home', 'away'];
     }
 }

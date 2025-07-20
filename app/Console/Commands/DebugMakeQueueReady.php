@@ -15,7 +15,7 @@ class DebugMakeQueueReady extends Command
 
     public function handle()
     {
-        $dummyCount = $this->option('dummyCount') ?? 6;
+        $dummyCount = $this->option('dummyCount') ?? $this->getDummyCount();
 
         for ($i = 0; $i < $dummyCount; $i++) {
             $player = Player::firstOrNew(['discord_id' => 'dummy' . $i]);
@@ -28,5 +28,11 @@ class DebugMakeQueueReady extends Command
         }
 
         $this->info('Added ' . $dummyCount . ' dummy players to queue.');
+    }
+
+    private function getDummyCount(): int
+    {
+        $queue = Queue::where('id', '=', $this->argument('queueId'))->first();
+        return $queue->getMaxPlayerCount() - 1;
     }
 }

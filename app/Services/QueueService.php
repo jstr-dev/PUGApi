@@ -187,7 +187,7 @@ class QueueService
 
     public function calculateNextPick(Queue &$queue)
     {
-        $order = ['home', 'away', 'away', 'home', 'home', 'away'];
+        $order = $queue->getPickingOrder(); 
         $remaining = $queue->players->whereNull('team')->count();
 
         return array_reverse($order)[max($remaining - 1, 0)];

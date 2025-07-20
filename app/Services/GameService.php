@@ -19,7 +19,7 @@ class GameService
             $game = new GameLobby();
             $game->queue_id = $queue->getKey();
             $game->password = '';
-            $game->slapshot_id = '';
+            $game->slapshot_id = 'temp-' . rand(100000, 999999);
             $game->name = $queue->name;
             $game->save();
 
@@ -34,6 +34,10 @@ class GameService
                 7,
                 4
             );
+
+            if (!$lobbyId) {
+                throw new Exception('Failed to create lobby.');
+            }
 
             $game->password = $password;
             $game->slapshot_id = $lobbyId;

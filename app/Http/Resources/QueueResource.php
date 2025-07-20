@@ -26,7 +26,8 @@ class QueueResource extends JsonResource
                     'updated_at' => $player->updated_at,
                 ];
             }),
-            'game' => $this->game ?? null
+            'game' => $this->game ?? null,
+            'max_players' => $this->getMaxPlayerCount(),
         ];
     }
 }
