@@ -2,6 +2,7 @@
 
 namespace App\DTO;
 
+use App\Models\GameLobby;
 use Carbon\Carbon;
 
 class SlapshotPeriodDTO
@@ -10,12 +11,14 @@ class SlapshotPeriodDTO
     protected Carbon $createdAt;
     protected int $gameLobbyId;
     protected string $matchSlapshotId;
+    protected int $period;
 
-    public function __construct(array $player, Carbon $createdAt, int $gameLobbyId, string $matchSlapshotId)
+    public function __construct(array $player, Carbon $createdAt, GameLobby $gameLobby, string $matchSlapshotId)
     {
         $this->player = $player;
         $this->createdAt = $createdAt;
-        $this->gameLobbyId = $gameLobbyId;
+        $this->gameLobbyId = $gameLobby->getKey();
+        $this->period = $gameLobby->period_count;
         $this->matchSlapshotId = $matchSlapshotId;
     }
 
@@ -58,8 +61,8 @@ class SlapshotPeriodDTO
                 'player_slapshot_id' => $this->player['game_user_id'],
                 'team' => $this->player['team'],
                 'created_at' => $this->createdAt->toDateTimeString(),
-                'updated_at' => $this->createdAt->toDateTimeString(),
                 'username' => $this->player['username'],
+                'period_number' => $this->period
             ],
 
             $this->filledStats()

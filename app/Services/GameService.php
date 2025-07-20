@@ -101,19 +101,25 @@ class GameService
 
         \Log::info('match data retrieved', $data);
 
-        if (empty($data['game_stats']) || empty($data['game_stats']['players'])) {
-            throw new Exception('No game stats');
-        }
+        DB::transaction(function() use (&$lobby, &$data, $matchId) {
+            if (empty($data['game_stats']) || empty($data['game_stats']['players'])) {
+                throw new Exception('No game stats');
+            }
 
-        $periodCreatedAt = Carbon::parse($data['created']);
-        $insert = [];
+            $lobby->period_count = $data['game_stats']['current_period'];
+            $lobby->save();
+            $periodCreatedAt = Carbon::parse($data['created']);
+            $insert = [];
 
-        foreach ($data['game_stats']['players'] as $player) {
-            $insert[] = (new SlapshotPeriodDTO($player, $periodCreatedAt, $lobby->getKey(), $matchId))
-                ->toArray();
-        }
+            foreach ($data['game_stats']['players'] as $player) {
+                $insert[] = (new SlapshotPeriodDTO($player, $periodCreatedAt, $lobby, $matchId))
+                    ->toArray();
+            }
 
-        GamePeriod::insert($insert);
+            GamePeriod::insertOrIgnore($insert);
+
+            // $this->updatePlayerStatistics($lobby);
+        });
     }
 
     public function calculateEloDifference(int $eloA, int $eloB, bool $won, int $kFactor = 40)
