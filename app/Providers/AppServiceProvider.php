@@ -32,6 +32,11 @@ class AppServiceProvider extends ServiceProvider
             config(['app.url' => getenv('NGROK_URL')]);
             config(['services.slapshot.webhook' => getenv('NGROK_URL') . '/api/slapshot/lobby_webhook']);
             config(['services.steam.redirect' => getenv('NGROK_URL') . '/steam/auth/callback']);
+
+            if (class_exists(\Laravel\Telescope\TelescopeServiceProvider::class)) {
+                $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);
+                $this->app->register(TelescopeServiceProvider::class);
+            }
         }
     }
 }

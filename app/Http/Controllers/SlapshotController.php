@@ -10,10 +10,6 @@ class SlapshotController extends Controller
 {
     public function postLobbyWebhook(GameService $gameService, Request $request)
     {
-        \Log::info('------------------------- SLAPSHOT WEBHOOK CALL ---------------------');
-        \Log::info(json_encode($request->all(), JSON_PRETTY_PRINT));
-        \Log::info('----------------------------------------------------------------------');
-
         $request->validate([
             'lobby_id' => 'required',
             'match_id' => 'required',

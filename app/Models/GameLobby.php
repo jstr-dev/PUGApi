@@ -12,4 +12,9 @@ class GameLobby extends Model
     {
         return $this->belongsToMany(Player::class, 'game_players');
     }
+    
+    public function periods()
+    {
+        return $this->hasMany(GamePeriod::class);
+    }
 }

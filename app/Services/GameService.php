@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\DTO\SlapshotPeriodDTO;
 use App\Models\GameLobby;
+use App\Models\GamePeriod;
 use App\Models\GamePlayers;
 use App\Models\Player;
 use App\Models\Queue;
+use Carbon\Carbon;
 use DB;
 use Exception;
 
@@ -63,11 +66,6 @@ class GameService
         return $record;
     }
 
-    private function addPeriodToGame(GameLobby &$lobby, string $matchId)
-    {
-        // $data = $slapshot->getMatch($matchId);
-    }
-
     private function tryEndGame(GameLobby &$lobby)
     {
         // Try to end the game... blah
@@ -76,14 +74,6 @@ class GameService
 
     public function processWebhook(GameLobby $lobby, string $matchId, string $event)
     {
-        // Update game table state
-        // Try that slapshot delete lobby call
-        // Record to GamePeriods table
-        // On finalise game update Elo ratings (MAIN)
-
-        $matchData = (new Slapshot())->getMatchDetails($matchId);
-        \Log::info(json_encode($matchData, JSON_PRETTY_PRINT));
-
         switch ($event) {
             case 'match_started':
                 $lobby->state = 'playing';
@@ -91,16 +81,39 @@ class GameService
                 break;
             case 'match_ended':
             case 'stats_reported':
-                // if ($lobby->periods->where('slapshot_id', '=', $matchId)->count() > 0) {
-                //     break;
-                // }
-
-                // $this->addPeriodToGame($lobby, $matchId);
-                // $this->tryEndGame($lobby);
+                $this->processGamePeriod($lobby, $matchId); 
+                break;
             case 'lobby_destroyed':
             default:
             // throw new Exception('Unknown lobby event');
         }
+    }
+    
+    private function processGamePeriod(GameLobby &$lobby, string $matchId)
+    {
+        // Check if the period has already been processed.
+        if ($lobby->periods()->where('match_slapshot_id', '=', $matchId)->exists()) {
+            return;
+        }
+
+        $slapshot = app(Slapshot::class);
+        $data = $slapshot->getMatchDetails($matchId);
+
+        \Log::info('match data retrieved', $data);
+
+        if (empty($data['game_stats']) || empty($data['game_stats']['players'])) {
+            throw new Exception('No game stats');
+        }
+
+        $periodCreatedAt = Carbon::parse($data['created']);
+        $insert = [];
+
+        foreach ($data['game_stats']['players'] as $player) {
+            $insert[] = (new SlapshotPeriodDTO($player, $periodCreatedAt, $lobby->getKey(), $matchId))
+                ->toArray();
+        }
+
+        GamePeriod::insert($insert);
     }
 
     public function calculateEloDifference(int $eloA, int $eloB, bool $won, int $kFactor = 40)
